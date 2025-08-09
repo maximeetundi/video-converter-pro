@@ -19,6 +19,14 @@ progress_status = {}
 # Fichiers à exclure des listes
 EXCLUDED_FILES = {os.path.basename(__file__), os.path.basename(DB_PATH), 'server_pikpak.py', 'converted'}
 
+# Types de médias autorisés pour l'upload local
+VIDEO_FORMATS = {"mp4", "webm", "mkv", "avi", "mov"}
+AUDIO_FORMATS = {"mp3", "aac", "m4a", "wav", "flac", "ogg"}
+ALLOWED_EXTENSIONS = {'.mp4', '.mkv', '.avi', '.mov', '.flv', '.wmv', '.webm', '.ts', '.m4v', '.mp3', '.aac', '.m4a', '.wav', '.flac', '.ogg'}
+
+def allowed_file(filename):
+    return os.path.splitext(filename)[1].lower() in ALLOWED_EXTENSIONS
+
 def init_db():
     with sqlite3.connect(DB_PATH) as conn:
         conn.execute('''CREATE TABLE IF NOT EXISTS history (
@@ -85,9 +93,10 @@ HTML_TEMPLATE = '''
         .then(data => {
           const progressEl = document.getElementById('progress');
           const progressBar = document.getElementById('progress-bar-inner');
+          const spanEl = progressEl.querySelector('span');
           if (data.message) {
             progressEl.classList.remove('hidden');
-            progressEl.querySelector('span').textContent = data.message;
+            spanEl.textContent = data.message;
             if (data.percentage !== undefined) {
               progressBar.style.width = data.percentage + '%';
             }
@@ -101,6 +110,38 @@ HTML_TEMPLATE = '''
              progressEl.classList.add('hidden');
           }
         });
+    }
+    
+    // Progression côté client pour l'upload local
+    function setupUploadProgress() {
+      const form = document.querySelector('form[action="/upload"]');
+      if (!form) return;
+      form.id = 'uploadForm';
+      form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        const fileInput = form.querySelector('input[type="file"][name="file"]');
+        if (!fileInput || !fileInput.files.length) { form.submit(); return; }
+        const progressEl = document.getElementById('progress');
+        const progressBar = document.getElementById('progress-bar-inner');
+        const spanEl = progressEl.querySelector('span');
+        progressEl.classList.remove('hidden');
+        spanEl.textContent = 'Téléversement... 0%';
+        progressBar.style.width = '0%';
+
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', '/upload');
+        xhr.upload.onprogress = function (evt) {
+          if (evt.lengthComputable) {
+            const percent = Math.round((evt.loaded / evt.total) * 100);
+            progressBar.style.width = percent + '%';
+            spanEl.textContent = 'Téléversement... ' + percent + '%';
+          }
+        };
+        xhr.onload = function () { window.location.reload(); };
+        xhr.onerror = function () { spanEl.textContent = 'Erreur de téléversement'; };
+        const fd = new FormData(form);
+        xhr.send(fd);
+      });
     }
     
     function deleteFile(fileType, filename) {
@@ -178,6 +219,7 @@ HTML_TEMPLATE = '''
         document.documentElement.classList.add('dark');
       }
       checkProgress();
+      setupUploadProgress();
       // Fermer les modales si on clique en dehors
       window.onclick = function(event) {
         const convModal = document.getElementById('conversionModal');
@@ -225,8 +267,16 @@ HTML_TEMPLATE = '''
           <label class="block text-md font-semibold text-gray-700 dark:text-gray-200 mb-2">Formats :</label>
           <div class="grid grid-cols-3 gap-2">
             <label class="flex items-center justify-center p-2 bg-gray-100 dark:bg-gray-700 rounded-lg cursor-pointer hover:bg-green-100 dark:hover:bg-green-900 transition-colors"><input type="checkbox" name="formats" value="mp4" class="mr-2 accent-green-500">MP4</label>
+            <label class="flex items-center justify-center p-2 bg-gray-100 dark:bg-gray-700 rounded-lg cursor-pointer hover:bg-green-100 dark:hover:bg-green-900 transition-colors"><input type="checkbox" name="formats" value="webm" class="mr-2 accent-green-500">WebM</label>
             <label class="flex items-center justify-center p-2 bg-gray-100 dark:bg-gray-700 rounded-lg cursor-pointer hover:bg-green-100 dark:hover:bg-green-900 transition-colors"><input type="checkbox" name="formats" value="mkv" class="mr-2 accent-green-500">MKV</label>
             <label class="flex items-center justify-center p-2 bg-gray-100 dark:bg-gray-700 rounded-lg cursor-pointer hover:bg-green-100 dark:hover:bg-green-900 transition-colors"><input type="checkbox" name="formats" value="avi" class="mr-2 accent-green-500">AVI</label>
+            <label class="flex items-center justify-center p-2 bg-gray-100 dark:bg-gray-700 rounded-lg cursor-pointer hover:bg-green-100 dark:hover:bg-green-900 transition-colors"><input type="checkbox" name="formats" value="mov" class="mr-2 accent-green-500">MOV</label>
+            <label class="flex items-center justify-center p-2 bg-gray-100 dark:bg-gray-700 rounded-lg cursor-pointer hover:bg-green-100 dark:hover:bg-green-900 transition-colors"><input type="checkbox" name="formats" value="mp3" class="mr-2 accent-green-500">MP3</label>
+            <label class="flex items-center justify-center p-2 bg-gray-100 dark:bg-gray-700 rounded-lg cursor-pointer hover:bg-green-100 dark:hover:bg-green-900 transition-colors"><input type="checkbox" name="formats" value="aac" class="mr-2 accent-green-500">AAC</label>
+            <label class="flex items-center justify-center p-2 bg-gray-100 dark:bg-gray-700 rounded-lg cursor-pointer hover:bg-green-100 dark:hover:bg-green-900 transition-colors"><input type="checkbox" name="formats" value="m4a" class="mr-2 accent-green-500">M4A</label>
+            <label class="flex items-center justify-center p-2 bg-gray-100 dark:bg-gray-700 rounded-lg cursor-pointer hover:bg-green-100 dark:hover:bg-green-900 transition-colors"><input type="checkbox" name="formats" value="wav" class="mr-2 accent-green-500">WAV</label>
+            <label class="flex items-center justify-center p-2 bg-gray-100 dark:bg-gray-700 rounded-lg cursor-pointer hover:bg-green-100 dark:hover:bg-green-900 transition-colors"><input type="checkbox" name="formats" value="flac" class="mr-2 accent-green-500">FLAC</label>
+            <label class="flex items-center justify-center p-2 bg-gray-100 dark:bg-gray-700 rounded-lg cursor-pointer hover:bg-green-100 dark:hover:bg-green-900 transition-colors"><input type="checkbox" name="formats" value="ogg" class="mr-2 accent-green-500">OGG</label>
           </div>
         </div>
 
@@ -249,6 +299,17 @@ HTML_TEMPLATE = '''
         <button onclick="toggleTheme()" class="mt-4 sm:mt-0 px-4 py-2 rounded-xl bg-slate-200 dark:bg-gray-800 hover:bg-slate-300 dark:hover:bg-gray-700 transition-all"><i class="fa-solid fa-moon dark:hidden"></i><i class="fa-solid fa-sun hidden dark:inline"></i><span class="ml-2 text-sm font-medium">Thème</span></button>
       </header>
 
+      <!-- Upload local -->
+      <div class="glass-effect p-6 rounded-2xl mb-6">
+        <h3 class="font-semibold mb-4"><i class="fa-solid fa-upload text-purple-600 mr-2"></i>Importer un média local</h3>
+        <form action="/upload" method="POST" enctype="multipart/form-data" class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+          <input type="file" name="file" required class="flex-1 px-4 py-2 rounded-xl bg-white/80 dark:bg-gray-900/80 border border-gray-200 dark:border-gray-600" accept=".mp4,.mkv,.avi,.mov,.flv,.wmv,.webm,.ts,.m4v" />
+          <button type="submit" class="px-5 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-blue-600 text-white font-semibold hover:from-purple-700 hover:to-blue-700 transition">
+            Importer
+          </button>
+        </form>
+      </div>
+
       <!-- Panneau de Progression -->
       <div id="progress" class="hidden mb-6">
         <div class="flex items-center space-x-3 p-4 bg-blue-50 dark:bg-gray-800 rounded-xl border border-blue-200 dark:border-gray-700">
@@ -268,7 +329,23 @@ HTML_TEMPLATE = '''
             <div><label class="block text-sm font-semibold mb-2">Lien Vidéo</label><input type="text" name="url" required class="w-full px-4 py-3 bg-white/80 dark:bg-gray-900/80 border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500" placeholder="Collez un lien HTTP, Magnet..."/></div>
             <div class="grid md:grid-cols-2 gap-6">
               <div><label class="block text-sm font-semibold mb-2">Résolutions</label><select name="resolutions" multiple class="w-full h-28 px-4 py-3 bg-white/80 dark:bg-gray-900/80 border-gray-200 dark:border-gray-600 rounded-xl"><option value="480p" selected>480p</option><option value="720p">720p</option><option value="1080p">1080p</option></select></div>
-              <div><label class="block text-sm font-semibold mb-2">Formats</label><select name="formats" multiple class="w-full h-28 px-4 py-3 bg-white/80 dark:bg-gray-900/80 border-gray-200 dark:border-gray-600 rounded-xl"><option value="mp4" selected>MP4</option><option value="webm">WebM</option><option value="mkv">MKV</option></select></div>
+              <div><label class="block text-sm font-semibold mb-2">Formats</label><select name="formats" multiple class="w-full h-28 px-4 py-3 bg-white/80 dark:bg-gray-900/80 border-gray-200 dark:border-gray-600 rounded-xl">
+                <optgroup label="Vidéo">
+                  <option value="mp4" selected>MP4</option>
+                  <option value="webm">WebM</option>
+                  <option value="mkv">MKV</option>
+                  <option value="avi">AVI</option>
+                  <option value="mov">MOV</option>
+                </optgroup>
+                <optgroup label="Audio">
+                  <option value="mp3">MP3</option>
+                  <option value="aac">AAC</option>
+                  <option value="m4a">M4A</option>
+                  <option value="wav">WAV</option>
+                  <option value="flac">FLAC</option>
+                  <option value="ogg">OGG</option>
+                </optgroup>
+              </select></div>
             </div>
             <div class="flex items-center"><input type="checkbox" name="perform_conversion" id="perform_conversion" checked class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"><label for="perform_conversion" class="ml-3 block text-sm font-medium">Convertir la vidéo après le téléchargement</label></div>
             <button type="submit" class="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 text-white font-semibold py-4 rounded-xl transition transform hover:scale-105 shadow-lg"><i class="fa-solid fa-rocket mr-2"></i>Lancer</button>
@@ -306,51 +383,121 @@ def format_size(bytes_size):
 # --- MISE À JOUR MAJEURE DE LA FONCTION DE CONVERSION ---
 def convert_video(filepath, resolutions, formats):
     name, _ = os.path.splitext(os.path.basename(filepath))
-    try:
-        # 1. Obtenir la durée de la vidéo avec ffprobe
-        probe_cmd = ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", filepath]
-        duration_process = subprocess.run(probe_cmd, capture_output=True, text=True, check=True)
-        total_duration = float(duration_process.stdout.strip())
-    except (subprocess.CalledProcessError, FileNotFoundError, ValueError):
-        total_duration = 0 # Impossible d'obtenir la durée, le pourcentage ne fonctionnera pas
 
-    total_conversions = len(resolutions) * len(formats)
+    # Détection des flux disponibles
+    def probe_value(args):
+        try:
+            res = subprocess.run(args, capture_output=True, text=True, check=True)
+            return res.stdout.strip()
+        except Exception:
+            return ""
+
+    def has_stream(kind):
+        v = probe_value(["ffprobe", "-v", "error", "-select_streams", f"{kind}:0", "-show_entries", "stream=index", "-of", "csv=p=0", filepath])
+        return v != ""
+
+    def media_duration():
+        try:
+            s = probe_value(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", filepath])
+            return float(s)
+        except Exception:
+            return 0.0
+
+    input_has_video = has_stream('v')
+    input_has_audio = has_stream('a')
+    total_duration = media_duration()
+
+    # Mapping des codecs audio
+    audio_codec_map = {
+        'mp3': ('libmp3lame', []),
+        'aac': ('aac', ["-b:a", "192k"]),
+        'm4a': ('aac', ["-b:a", "192k"]),
+        'wav': ('pcm_s16le', []),
+        'flac': ('flac', []),
+        'ogg': ('libvorbis', ["-q:a", "5"]),
+    }
+
+    # Préparer la liste de combinaisons: si format audio, ignorer résolutions
+    format_tasks = []
+    for fmt in formats:
+        fmt_l = fmt.lower()
+        if fmt_l in AUDIO_FORMATS:
+            format_tasks.append((None, fmt_l))  # pas de résolution nécessaire
+        else:
+            # vidéo: itérer sur résolutions
+            for res in resolutions:
+                format_tasks.append((res, fmt_l))
+
+    total_conversions = len(format_tasks)
     current_conversion = 0
 
-    for res in resolutions:
-        for fmt in formats:
-            current_conversion += 1
-            height = res.replace("p", "")
-            output_path = os.path.join(CONVERTED_DIR, f"{name}_{res}.{fmt}")
-            
-            # 2. Lancer ffmpeg avec les bons arguments pour suivre la progression
-            cmd = [
-                "ffmpeg", "-y", "-i", filepath,
-                "-vf", f"scale=-2:{height}",
-                "-c:v", "libx264", "-preset", "fast", "-crf", "28",
-                "-c:a", "aac", "-b:a", "128k",
-                output_path,
-                "-progress", "pipe:1", # Envoyer la progression à stdout
-                "-nostats"
-            ]
-            
-            process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+    for res, fmt in format_tasks:
+        current_conversion += 1
+        is_audio_target = fmt in AUDIO_FORMATS
+        is_video_target = fmt in VIDEO_FORMATS
 
-            # 3. Analyser la sortie de ffmpeg pour le pourcentage
-            for line in process.stdout:
-                if total_duration > 0 and "out_time_ms" in line:
-                    time_match = re.search(r"out_time_ms=(\d+)", line)
-                    if time_match:
-                        elapsed_ms = int(time_match.group(1))
-                        elapsed_sec = elapsed_ms / 1000000
-                        percentage = (elapsed_sec / total_duration) * 100
-                        msg = f"Conversion... {name} ({current_conversion}/{total_conversions}) - {percentage:.1f}%"
-                        progress_status.update({"message": msg, "percentage": percentage})
+        # Nom de sortie
+        if is_audio_target:
+            output_name = f"{name}.{fmt}"
+        else:
+            height = (res or "720p").replace("p", "")
+            output_name = f"{name}_{res}.{fmt}"
+        output_path = os.path.join(CONVERTED_DIR, output_name)
+
+        # Construire la commande ffmpeg selon les cas
+        cmd = ["ffmpeg", "-y"]
+
+        if is_audio_target:
+            # Video -> Audio (ou Audio -> autre audio)
+            cmd += ["-i", filepath, "-vn"]
+            acodec, extra = audio_codec_map.get(fmt, ('aac', ["-b:a", "192k"]))
+            cmd += ["-c:a", acodec] + extra
+            cmd += [output_path, "-progress", "pipe:1", "-nostats"]
+        else:
+            # Cible vidéo
+            if input_has_video:
+                # Vidéo -> Vidéo
+                height = (res or "720p").replace("p", "")
+                cmd += ["-i", filepath, "-vf", f"scale=-2:{height}", "-c:v", "libx264", "-preset", "fast", "-crf", "28"]
+                if input_has_audio:
+                    cmd += ["-c:a", "aac", "-b:a", "128k"]
                 else:
-                    msg = f"Conversion... {name} ({current_conversion}/{total_conversions})"
-                    progress_status.update({"message": msg})
-            
-            process.wait() # Attendre la fin du processus ffmpeg
+                    cmd += ["-an"]
+                cmd += [output_path, "-progress", "pipe:1", "-nostats"]
+            else:
+                # Audio -> Vidéo (générer un fond)
+                height = (res or "720p").replace("p", "")
+                width = {
+                    '2160': '3840', '1440': '2560', '1080': '1920', '720': '1280', '480': '854', '360': '640'
+                }.get(height, '1280')
+                size = f"{width}x{height}"
+                # flux couleur + audio, -shortest pour s'arrêter avec l'audio
+                cmd += [
+                    "-i", filepath,
+                    "-f", "lavfi", "-i", f"color=size={size}:rate=30:color=black",
+                    "-shortest",
+                    "-map", "1:v:0", "-map", "0:a:0",
+                    "-c:v", "libx264", "-preset", "fast", "-crf", "28",
+                    "-c:a", "aac", "-b:a", "192k",
+                    output_path, "-progress", "pipe:1", "-nostats"
+                ]
+
+        process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+
+        for line in process.stdout:
+            if total_duration > 0 and "out_time_ms" in line:
+                time_match = re.search(r"out_time_ms=(\d+)", line)
+                if time_match:
+                    elapsed_ms = int(time_match.group(1))
+                    elapsed_sec = elapsed_ms / 1000000
+                    percentage = (elapsed_sec / total_duration) * 100
+                    msg = f"Conversion... {name} ({current_conversion}/{total_conversions}) - {percentage:.1f}%"
+                    progress_status.update({"message": msg, "percentage": percentage})
+            else:
+                msg = f"Conversion... {name} ({current_conversion}/{total_conversions})"
+                progress_status.update({"message": msg})
+
+        process.wait()
 
 def cleanup_old_files():
     now = time.time()
@@ -366,7 +513,11 @@ def cleanup_old_files():
 def index():
     cleanup_old_files()
     now = time.time()
-    original_files = [{'name': f, 'size': format_size(os.path.getsize(os.path.join(UPLOAD_DIR, f)))} for f in os.listdir(UPLOAD_DIR) if f not in EXCLUDED_FILES and os.path.isfile(os.path.join(UPLOAD_DIR, f))]
+    original_files = [
+        {'name': f, 'size': format_size(os.path.getsize(os.path.join(UPLOAD_DIR, f)))}
+        for f in os.listdir(UPLOAD_DIR)
+        if f not in EXCLUDED_FILES and os.path.isfile(os.path.join(UPLOAD_DIR, f)) and allowed_file(f)
+    ]
     converted_files = []
     for f in os.listdir(CONVERTED_DIR):
         fpath = os.path.join(CONVERTED_DIR, f)
@@ -429,10 +580,27 @@ def download():
     threading.Thread(target=start_processing_thread, kwargs={'target_func': download_task, **args}).start()
     return redirect(url_for('index'))
 
+# --- ROUTE D'UPLOAD LOCAL ---
+@app.route('/upload', methods=['POST'])
+def upload_file():
+    if 'file' not in request.files:
+        return redirect(url_for('index'))
+    file = request.files['file']
+    if file.filename == '':
+        return redirect(url_for('index'))
+    if file and allowed_file(file.filename):
+        save_path = os.path.join(UPLOAD_DIR, file.filename)
+        file.save(save_path)
+    return redirect(url_for('index'))
+
 # --- NOUVELLE ROUTE POUR LA RE-CONVERSION ---
 @app.route('/convert/<path:filename>', methods=['POST'])
 def convert_existing(filename):
     filepath = os.path.join(UPLOAD_DIR, filename)
+    if not os.path.exists(filepath):
+        # permettre la reconversion depuis le dossier converted également
+        alt = os.path.join(CONVERTED_DIR, filename)
+        filepath = alt if os.path.exists(alt) else filepath
     if not os.path.exists(filepath):
         return "Fichier non trouvé", 404
 
@@ -452,7 +620,11 @@ def convert_existing(filename):
 
 @app.route('/progress')
 def progress():
-    return jsonify(progress_status)
+    # Éviter la boucle de rechargement: effacer l'état une fois terminé
+    data = dict(progress_status)
+    if progress_status.get('done'):
+        progress_status.clear()
+    return jsonify(data)
 
 @app.route('/files/<path:filename>')
 def serve_converted_file(filename):
